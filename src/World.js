@@ -1,31 +1,42 @@
-import { $componentMap } from './Component.js'
-import { $queryMap, $queries, $dirtyQueries, $notQueries } from './Query.js'
-import { $entityArray, $entityComponents, $entityMasks, $entitySparseSet, getGlobalSize, removeEntity } from './Entity.js'
-import { resize } from './Storage.js'
-import { SparseSet } from './Util.js'
+import { $componentMap } from "./Component.js";
+import { $queryMap, $queries, $dirtyQueries, $notQueries } from "./Query.js";
+import {
+  $entityArray,
+  $entityComponents,
+  $entityMasks,
+  $entitySparseSet,
+  $globalEntityCursor,
+  $globalSize,
+  $removed,
+  $recycled,
+  getGlobalSize,
+  removeEntity,
+} from "./Entity.js";
+import { resize } from "./Storage.js";
+import { SparseSet } from "./Util.js";
 
-export const $size = Symbol('size')
-export const $resizeThreshold = Symbol('resizeThreshold')
-export const $bitflag = Symbol('bitflag')
-export const $archetypes = Symbol('archetypes')
-export const $localEntities = Symbol('localEntities')
-export const $localEntityLookup = Symbol('localEntityLookup')
-export const $manualEntityRecycling = Symbol('manualEntityRecycling')
+export const $size = Symbol("size");
+export const $resizeThreshold = Symbol("resizeThreshold");
+export const $bitflag = Symbol("bitflag");
+export const $archetypes = Symbol("archetypes");
+export const $localEntities = Symbol("localEntities");
+export const $localEntityLookup = Symbol("localEntityLookup");
+export const $manualEntityRecycling = Symbol("manualEntityRecycling");
 
-export const worlds = []
+export const worlds = [];
 
 export const resizeWorlds = (size) => {
-  worlds.forEach(world => {
-    world[$size] = size
+  worlds.forEach((world) => {
+    world[$size] = size;
 
     for (let i = 0; i < world[$entityMasks].length; i++) {
       const masks = world[$entityMasks][i];
-      world[$entityMasks][i] = resize(masks, size)
+      world[$entityMasks][i] = resize(masks, size);
     }
-    
-    world[$resizeThreshold] = world[$size] - (world[$size] / 5)
-  })
-}
+
+    world[$resizeThreshold] = world[$size] - world[$size] / 5;
+  });
+};
 
 /**
  * Creates a new world.
@@ -33,22 +44,21 @@ export const resizeWorlds = (size) => {
  * @returns {object}
  */
 export const createWorld = (...args) => {
-  const world = typeof args[0] === 'object'
-    ? args[0]
-    : {}
-  const size = typeof args[0] === 'number' 
-    ? args[0] 
-    : typeof args[1] === 'number' 
-      ? args[1] 
-      : getGlobalSize()
-  resetWorld(world, size)
-  worlds.push(world)
-  return world
-}
+  const world = typeof args[0] === "object" ? args[0] : {};
+  const size =
+    typeof args[0] === "number"
+      ? args[0]
+      : typeof args[1] === "number"
+      ? args[1]
+      : getGlobalSize();
+  resetWorld(world, size);
+  worlds.push(world);
+  return world;
+};
 
 export const enableManualEntityRecycling = (world) => {
-  world[$manualEntityRecycling] = true
-}
+  world[$manualEntityRecycling] = true;
+};
 
 /**
  * Resets a world.
@@ -57,33 +67,40 @@ export const enableManualEntityRecycling = (world) => {
  * @returns {object}
  */
 export const resetWorld = (world, size = getGlobalSize()) => {
-  world[$size] = size
+  world[$size] = size;
 
-  if (world[$entityArray]) world[$entityArray].forEach(eid => removeEntity(world, eid))
+  if (world[$entityArray])
+    world[$entityArray].forEach((eid) => removeEntity(world, eid));
 
-  world[$entityMasks] = [new Uint32Array(size)]
-  world[$entityComponents] = new Map()
-  world[$archetypes] = []
+  world[$globalEntityCursor] = 0;
+  world[$globalSize] = size;
 
-  world[$entitySparseSet] = SparseSet()
-  world[$entityArray] = world[$entitySparseSet].dense
+  world[$removed] = [];
+  world[$recycled] = [];
 
-  world[$bitflag] = 1
+  world[$entityMasks] = [new Uint32Array(size)];
+  world[$entityComponents] = new Map();
+  world[$archetypes] = [];
 
-  world[$componentMap] = new Map()
+  world[$entitySparseSet] = SparseSet();
+  world[$entityArray] = world[$entitySparseSet].dense;
 
-  world[$queryMap] = new Map()
-  world[$queries] = new Set()
-  world[$notQueries] = new Set()
-  world[$dirtyQueries] = new Set()
+  world[$bitflag] = 1;
 
-  world[$localEntities] = new Map()
-  world[$localEntityLookup] = new Map()
+  world[$componentMap] = new Map();
 
-  world[$manualEntityRecycling] = false
+  world[$queryMap] = new Map();
+  world[$queries] = new Set();
+  world[$notQueries] = new Set();
+  world[$dirtyQueries] = new Set();
 
-  return world
-}
+  world[$localEntities] = new Map();
+  world[$localEntityLookup] = new Map();
+
+  world[$manualEntityRecycling] = false;
+
+  return world;
+};
 
 /**
  * Deletes a world.
@@ -91,23 +108,28 @@ export const resetWorld = (world, size = getGlobalSize()) => {
  * @param {World} world
  */
 export const deleteWorld = (world) => {
-  Object.getOwnPropertySymbols(world).forEach($ => { delete world[$] })
-  Object.keys(world).forEach(key => { delete world[key] })
-  worlds.splice(worlds.indexOf(world), 1)
-}
+  Object.getOwnPropertySymbols(world).forEach(($) => {
+    delete world[$];
+  });
+  Object.keys(world).forEach((key) => {
+    delete world[key];
+  });
+  worlds.splice(worlds.indexOf(world), 1);
+};
 
 /**
  * Returns all components registered to a world
- * 
- * @param {World} world 
+ *
+ * @param {World} world
  * @returns Array
  */
-export const getWorldComponents = (world) => Array.from(world[$componentMap].keys())
+export const getWorldComponents = (world) =>
+  Array.from(world[$componentMap].keys());
 
 /**
  * Returns all existing entities in a world
- * 
- * @param {World} world 
+ *
+ * @param {World} world
  * @returns Array
  */
-export const getAllEntities = (world) => world[$entitySparseSet].dense.slice(0)
+export const getAllEntities = (world) => world[$entitySparseSet].dense.slice(0);
